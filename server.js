@@ -1,0 +1,40 @@
+import dotenv from "dotenv";
+dotenv.config() 
+import express from "express"
+import cors from "cors"
+import { connectDB } from "./src/config/db.js";
+import userAuthRoute from "./src/modules/user/user.routes.js"
+import invoiceRoute from "./src/modules/invoice/invoice.routes.js"
+import productRoute from "./src/modules/product/product.routes.js"
+
+const PORT = process.env.PORT
+
+connectDB();
+
+console.log("Loaded JWT_SECRET:", process.env.JWT_SECRET);
+
+const app = express();
+app.use(express.json())
+
+app.use(cors({
+  origin: "http://localhost:5173",
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+}));
+
+app.use("/uploads", express.static("src/uploads"));
+
+app.get("/test", (req, res) => {
+  res.send("VERY VERY GOOD KIND2")
+})
+app.use("/api/auth/user", userAuthRoute)
+app.use("/api/invoice", invoiceRoute)
+app.use("/api/product", productRoute)
+
+
+app.listen(PORT, () => {
+    console.log(`Server is listening on PORT ${PORT}`)
+})
+
+
+
