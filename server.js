@@ -22,6 +22,9 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 }));
 
+console.log("CLIENT_URL:", process.env.CLIENT_URL);
+
+
 app.use("/uploads", express.static("src/uploads"));
 
 app.get("/test", (req, res) => {
