@@ -20,3 +20,33 @@ export const protect = async (req, res, next) => {
     return res.status(401).json({ message: "Token invalid", error: error.message });
   }
 };
+
+export const superAdminOnly = (req, res, next) => {
+  if (req.user.role !== "superadmin") {
+    return res.status(403).json({
+      success: false,
+      message: "Super Admin access required",
+    });
+  }
+  next();
+};
+
+export const checkPermission = (permission) => {
+  return (req, res, next) => {
+    // Super admin has full access
+    if (req.user.role === "superadmin") {
+      return next();
+    }
+
+    // Cashier permission check
+    if (!req.user.permissions?.includes(permission)) {
+      return res.status(403).json({
+        success: false,
+        message: "Permission denied",
+      });
+    }
+
+    next();
+  };
+};
+

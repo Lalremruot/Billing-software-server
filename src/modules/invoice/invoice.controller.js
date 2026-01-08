@@ -42,9 +42,30 @@ export const createInvoice = async (req, res) => {
     };
 
     if (!payload.invoiceNumber) {
+      // Generate sequential invoice number
       const prefix = user.invoicePrefix || "INV#";
-      const randomNum = Math.floor(100000 + Math.random() * 900000);
-      payload.invoiceNumber = `${prefix}${randomNum}`;
+      
+      // Find the highest invoice number for this user
+      const highestInvoice = await InvoiceModel.findOne({
+        user: req.user.id,
+        invoiceNumber: { $exists: true, $ne: null },
+      })
+        .sort({ invoiceNumber: -1 })
+        .select("invoiceNumber");
+
+      let nextNumber = 1;
+      
+      if (highestInvoice && highestInvoice.invoiceNumber) {
+        // Extract numeric part from invoice number (e.g., "INV#00001" -> 1)
+        const match = highestInvoice.invoiceNumber.match(/(\d+)$/);
+        if (match) {
+          nextNumber = parseInt(match[1], 10) + 1;
+        }
+      }
+
+      // Format with leading zeros (5 digits: 00001, 00002, etc.)
+      const formattedNumber = String(nextNumber).padStart(5, "0");
+      payload.invoiceNumber = `${prefix}${formattedNumber}`;
     }
 
     const invoice = new InvoiceModel(payload);
@@ -302,8 +323,28 @@ export const getNextInvoiceNumber = async (req, res) => {
     }
 
     const prefix = user.invoicePrefix || "INV#";
-    const randomNum = Math.floor(100000 + Math.random() * 900000);
-    const invoiceNumber = `${prefix}${randomNum}`;
+    
+    // Find the highest invoice number for this user
+    const highestInvoice = await InvoiceModel.findOne({
+      user: req.user.id,
+      invoiceNumber: { $exists: true, $ne: null },
+    })
+      .sort({ invoiceNumber: -1 })
+      .select("invoiceNumber");
+
+    let nextNumber = 1;
+    
+    if (highestInvoice && highestInvoice.invoiceNumber) {
+      // Extract numeric part from invoice number (e.g., "INV#00001" -> 1)
+      const match = highestInvoice.invoiceNumber.match(/(\d+)$/);
+      if (match) {
+        nextNumber = parseInt(match[1], 10) + 1;
+      }
+    }
+
+    // Format with leading zeros (5 digits: 00001, 00002, etc.)
+    const formattedNumber = String(nextNumber).padStart(5, "0");
+    const invoiceNumber = `${prefix}${formattedNumber}`;
 
     return res.status(200).json({
       success: true,

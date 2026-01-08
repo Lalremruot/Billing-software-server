@@ -32,12 +32,22 @@ const userSchema = new mongoose.Schema(
     },
     invoicePrefix: {
       type: String,
-      default: "INV#",
+      default: "ACK#",
       trim: true,
     },
     password: {
       type: String,
       required: true,
+    },
+    role: {
+      type: String,
+      enum: ["superadmin", "cashier"],
+      default: "cashier",
+    },
+
+    permissions: {
+      type: [String], // Only used for cashier
+      default: [],
     },
     resetToken: String,
     resetTokenExpire: Date,

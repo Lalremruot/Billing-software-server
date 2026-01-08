@@ -6,6 +6,9 @@ import { connectDB } from "./src/config/db.js";
 import userAuthRoute from "./src/modules/user/user.routes.js"
 import invoiceRoute from "./src/modules/invoice/invoice.routes.js"
 import productRoute from "./src/modules/product/product.routes.js"
+import createCashierRoute from "./src/modules/cashier/cashier.routes.js"
+import employeeRoute from "./src/modules/employee/employee.routes.js"
+import inventoryRoute from "./src/modules/inventory/inventory.routes.js"
 
 const PORT = process.env.PORT
 
@@ -33,6 +36,9 @@ app.get("/test", (req, res) => {
 app.use("/api/auth/user", userAuthRoute)
 app.use("/api/invoice", invoiceRoute)
 app.use("/api/product", productRoute)
+app.use("/api/cashier", createCashierRoute)
+app.use("/api/employee", employeeRoute)
+app.use("/api/inventory", inventoryRoute)
 
 
 app.listen(PORT, () => {

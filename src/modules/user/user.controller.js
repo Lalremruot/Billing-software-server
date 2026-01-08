@@ -3,10 +3,10 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
 
-
 export const signUp = async (req, res) => {
   try {
     const { businessName, email, password } = req.body;
+
     if (!businessName || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -20,65 +20,76 @@ export const signUp = async (req, res) => {
         message: "Password must be at least 6 characters long.",
       });
     }
-    const existingUser = await UserModel.findOne({ email });
-    if (existingUser) {
-      return res
-        .status(409)
-        .json({
-          message: "User already exists, try logging in",
-          success: false,
-        });
-    }
-    const user = new UserModel({ businessName, email, password });
-    user.password = await bcrypt.hash(password, 10);
-    await user.save();
-    res.status(201).json({ message: "Signup successfull", success: true });
-  } catch (error) {
-    return res
-      .status(500)
-      .json({
-        message: "Internal server error. Please try again later.",
+
+    // 🔒 CHECK IF SUPER ADMIN ALREADY EXISTS
+    const superAdminExists = await UserModel.findOne({ role: "superadmin" });
+    if (superAdminExists) {
+      return res.status(403).json({
         success: false,
+        message: "Super Admin already exists. Signup is disabled.",
       });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = new UserModel({
+      businessName,
+      email,
+      password: hashedPassword,
+      role: "superadmin", // 👈 IMPORTANT
+    });
+
+    await user.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Super Admin created successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+    });
   }
 };
 
 export const login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        const user = await UserModel.findOne({ email });
-        if(!user) {
-            return res.status(403).json({
-                success: false,
-                message: "Login failed. Please try again"
-            })
-        }
-        const isPasswordEqual = await bcrypt.compare(password, user.password)
-         if(!isPasswordEqual) {
-            return res.status(403).json({
-                success: false,
-                message: "Login failed. Please try again"
-            })
-        }
-        const jwtToken = jwt.sign(
-            { email: user.email, id: user._id},
-            process.env.JWT_SECRET,
-            { expiresIn: "7d"}
-        )
-        res.status(201).json({
-                success: true,
-                message: "Login Successfull",
-                token: jwtToken,
-                email: user.email,
-            })
-    } catch (error) {
+  try {
+    const { email, password } = req.body;
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      return res.status(403).json({
+        success: false,
+        message: "Login failed. Please try again",
+      });
+    }
+    const isPasswordEqual = await bcrypt.compare(password, user.password);
+    if (!isPasswordEqual) {
+      return res.status(403).json({
+        success: false,
+        message: "Login failed. Please try again",
+      });
+    }
+    const jwtToken = jwt.sign(
+      { email: user.email, id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "365d" }
+    );
+    res.status(200).json({
+      success: true,
+      message: "Login Successful",
+      token: jwtToken,
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions,
+    });
+  } catch (error) {
     res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
-    }
-}
-
+  }
+};
 
 export const forgotPassword = async (req, res) => {
   try {
@@ -96,11 +107,14 @@ export const forgotPassword = async (req, res) => {
       // For security, don't reveal if user exists or not
       return res.status(200).json({
         success: true,
-        message: "If an account exists for this email, a reset link has been sent.",
+        message:
+          "If an account exists for this email, a reset link has been sent.",
       });
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "15m",
+    });
 
     user.resetToken = token;
     user.resetTokenExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
@@ -109,21 +123,34 @@ export const forgotPassword = async (req, res) => {
     try {
       // Check if email credentials are configured
       if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.error("❌ Email credentials not configured. EMAIL_USER and EMAIL_PASS must be set in .env");
+        console.error(
+          "❌ Email credentials not configured. EMAIL_USER and EMAIL_PASS must be set in .env"
+        );
         // For development, log the reset link to console
-        const link = `${process.env.CLIENT_URL || "http://localhost:5173"}/auth/reset-password/${token}`;
-        console.log("🔗 Password Reset Link (EMAIL NOT CONFIGURED - Use this link):", link);
+        const link = `${
+          process.env.CLIENT_URL || "http://localhost:5173"
+        }/auth/reset-password/${token}`;
+        console.log(
+          "🔗 Password Reset Link (EMAIL NOT CONFIGURED - Use this link):",
+          link
+        );
         return res.status(200).json({
           success: true,
-          message: "Reset link generated. Check server console for the link (email not configured).",
+          message:
+            "Reset link generated. Check server console for the link (email not configured).",
           resetLink: process.env.NODE_ENV === "development" ? link : undefined, // Only send in dev
         });
       }
 
       // Check if we should skip email sending (for testing)
       if (process.env.SKIP_EMAIL === "true") {
-        const link = `${process.env.CLIENT_URL || "http://localhost:5173"}/auth/reset-password/${token}`;
-        console.log("🔗 Password Reset Link (EMAIL SKIPPED - Use this link):", link);
+        const link = `${
+          process.env.CLIENT_URL || "http://localhost:5173"
+        }/auth/reset-password/${token}`;
+        console.log(
+          "🔗 Password Reset Link (EMAIL SKIPPED - Use this link):",
+          link
+        );
         return res.status(200).json({
           success: true,
           message: "Reset link generated. Check server console for the link.",
@@ -133,29 +160,44 @@ export const forgotPassword = async (req, res) => {
 
       // Determine if using Gmail or custom SMTP
       const emailUser = process.env.EMAIL_USER?.trim();
-      const emailPass = process.env.EMAIL_PASS?.trim().replace(/\s+/g, "") || "";
-      
+      const emailPass =
+        process.env.EMAIL_PASS?.trim().replace(/\s+/g, "") || "";
+
       // Debug logging (only show first/last chars for security)
       console.log("📧 Email Configuration:");
-      console.log("   EMAIL_USER:", emailUser ? `${emailUser.substring(0, 3)}***${emailUser.substring(emailUser.length - 10)}` : "NOT SET");
-      console.log("   EMAIL_PASS:", emailPass ? `${emailPass.substring(0, 2)}***${emailPass.substring(emailPass.length - 2)} (${emailPass.length} chars)` : "NOT SET");
-      
+      console.log(
+        "   EMAIL_USER:",
+        emailUser
+          ? `${emailUser.substring(0, 3)}***${emailUser.substring(
+              emailUser.length - 10
+            )}`
+          : "NOT SET"
+      );
+      console.log(
+        "   EMAIL_PASS:",
+        emailPass
+          ? `${emailPass.substring(0, 2)}***${emailPass.substring(
+              emailPass.length - 2
+            )} (${emailPass.length} chars)`
+          : "NOT SET"
+      );
+
       if (!emailUser || !emailPass) {
         throw new Error("EMAIL_USER or EMAIL_PASS not configured in .env file");
       }
-      
+
       const isGmail = emailUser.endsWith("@gmail.com");
-      
+
       let transporter;
-      
+
       if (isGmail) {
         // Gmail configuration
         transporter = nodemailer.createTransport({
           service: "gmail",
           auth: {
             user: emailUser,
-            pass: emailPass
-          }
+            pass: emailPass,
+          },
         });
       } else {
         // Custom SMTP configuration (for non-Gmail emails)
@@ -165,8 +207,8 @@ export const forgotPassword = async (req, res) => {
           secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
           auth: {
             user: emailUser,
-            pass: process.env.EMAIL_PASS.trim().replace(/\s+/g, "")
-          }
+            pass: process.env.EMAIL_PASS.trim().replace(/\s+/g, ""),
+          },
         });
       }
 
@@ -175,25 +217,41 @@ export const forgotPassword = async (req, res) => {
         await transporter.verify();
         console.log("✅ Email server connection verified");
       } catch (verifyError) {
-        console.error("❌ Email server verification failed:", verifyError.message);
+        console.error(
+          "❌ Email server verification failed:",
+          verifyError.message
+        );
         console.error("💡 Make sure:");
         console.error("   1. EMAIL_USER is your full Gmail address");
-        console.error("   2. EMAIL_PASS is a Gmail App Password (not your regular password)");
-        console.error("   3. 2-Step Verification is enabled on your Google account");
-        console.error("   4. App Password is generated at: https://myaccount.google.com/apppasswords");
-        
+        console.error(
+          "   2. EMAIL_PASS is a Gmail App Password (not your regular password)"
+        );
+        console.error(
+          "   3. 2-Step Verification is enabled on your Google account"
+        );
+        console.error(
+          "   4. App Password is generated at: https://myaccount.google.com/apppasswords"
+        );
+
         // Still log the link for development
-        const link = `${process.env.CLIENT_URL || "http://localhost:5173"}/auth/reset-password/${token}`;
-        console.log("🔗 Password Reset Link (EMAIL FAILED - Use this link):", link);
-        
+        const link = `${
+          process.env.CLIENT_URL || "http://localhost:5173"
+        }/auth/reset-password/${token}`;
+        console.log(
+          "🔗 Password Reset Link (EMAIL FAILED - Use this link):",
+          link
+        );
+
         throw verifyError;
       }
 
-      const link = `${process.env.CLIENT_URL || "http://localhost:5173"}/auth/reset-password/${token}`;
+      const link = `${
+        process.env.CLIENT_URL || "http://localhost:5173"
+      }/auth/reset-password/${token}`;
 
       // Use EMAIL_FROM if set, otherwise use EMAIL_USER
       const fromEmail = process.env.EMAIL_FROM || emailUser;
-      
+
       const mailOptions = {
         from: `"Lamka Billing" <${fromEmail}>`,
         to: user.email,
@@ -216,7 +274,7 @@ export const forgotPassword = async (req, res) => {
               This link will expire in 15 minutes. If you didn't request this, please ignore this email.
             </p>
           </div>
-        `
+        `,
       };
 
       const info = await transporter.sendMail(mailOptions);
@@ -233,26 +291,29 @@ export const forgotPassword = async (req, res) => {
       });
     } catch (emailError) {
       console.error("❌ Email sending error:", emailError);
-      
+
       // Always log the reset link when email fails
-      const link = `${process.env.CLIENT_URL || "http://localhost:5173"}/auth/reset-password/${token}`;
+      const link = `${
+        process.env.CLIENT_URL || "http://localhost:5173"
+      }/auth/reset-password/${token}`;
       console.log("\n" + "=".repeat(60));
       console.log("🔗 PASSWORD RESET LINK (EMAIL FAILED):");
       console.log(link);
       console.log("=".repeat(60) + "\n");
 
       // Return error details in development, generic message in production
-      const isDevelopment = process.env.NODE_ENV === "development" || !process.env.NODE_ENV;
-      const errorMessage = isDevelopment 
+      const isDevelopment =
+        process.env.NODE_ENV === "development" || !process.env.NODE_ENV;
+      const errorMessage = isDevelopment
         ? `Email sending failed. Check server console for the reset link.`
         : "If an account exists for this email, a reset link has been sent.";
 
       return res.status(200).json({
         success: true,
         message: errorMessage,
-        ...(isDevelopment && { 
+        ...(isDevelopment && {
           resetLink: link,
-          note: "Email failed to send. Use the resetLink above or check server console."
+          note: "Email failed to send. Use the resetLink above or check server console.",
         }),
       });
     }
