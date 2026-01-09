@@ -2,21 +2,41 @@ import EmployeeModel from "./employee.model.js";
 
 export const createEmployee = async (req, res) => {
   try {
-    const { name, age, dob, contactNumber, salary } = req.body;
+    const { name, email, phone, position, department } = req.body;
 
-    if (!name || !age || !dob || !contactNumber || !salary) {
+    if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required",
+        message: "Employee name is required",
+      });
+    }
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Employee email is required",
+      });
+    }
+
+    // Check if employee with same email already exists for this user
+    const existingEmployee = await EmployeeModel.findOne({
+      user: req.user.id,
+      email: email.toLowerCase().trim(),
+    });
+
+    if (existingEmployee) {
+      return res.status(409).json({
+        success: false,
+        message: "Employee with this email already exists",
       });
     }
 
     const employee = new EmployeeModel({
       name: name.trim(),
-      age: parseInt(age),
-      dob: new Date(dob),
-      contactNumber: contactNumber.trim(),
-      salary: parseFloat(salary),
+      email: email.toLowerCase().trim(),
+      phone: phone || "",
+      position: position || "",
+      department: department || "",
       user: req.user.id,
     });
 
@@ -27,11 +47,9 @@ export const createEmployee = async (req, res) => {
       data: savedEmployee,
     });
   } catch (error) {
-    console.error("Create employee error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to create employee",
-      error: error.message,
+      message: error.message || "Failed to create employee",
     });
   }
 };
@@ -55,7 +73,6 @@ export const getAllEmployees = async (req, res) => {
       data: employees,
     });
   } catch (error) {
-    console.error("Get employees error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch employees",
@@ -64,40 +81,10 @@ export const getAllEmployees = async (req, res) => {
   }
 };
 
-export const getEmployeeById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const employee = await EmployeeModel.findOne({
-      _id: id,
-      user: req.user.id,
-    });
-
-    if (!employee) {
-      return res.status(404).json({
-        success: false,
-        message: "Employee not found or does not belong to this user",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Employee fetched successfully",
-      data: employee,
-    });
-  } catch (error) {
-    console.error("Get employee error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch employee",
-      error: error.message,
-    });
-  }
-};
-
 export const updateEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, age, dob, contactNumber, salary } = req.body;
+    const { name, email, phone, position, department } = req.body;
 
     const employee = await EmployeeModel.findOne({
       _id: id,
@@ -111,26 +98,43 @@ export const updateEmployee = async (req, res) => {
       });
     }
 
-    const updateData = {};
-    if (name) updateData.name = name.trim();
-    if (age !== undefined) updateData.age = parseInt(age);
-    if (dob) updateData.dob = new Date(dob);
-    if (contactNumber) updateData.contactNumber = contactNumber.trim();
-    if (salary !== undefined) updateData.salary = parseFloat(salary);
+    // Check if email is being changed and if it's already taken
+    if (email && email.toLowerCase().trim() !== employee.email) {
+      const existingEmployee = await EmployeeModel.findOne({
+        user: req.user.id,
+        email: email.toLowerCase().trim(),
+        _id: { $ne: id },
+      });
 
-    const updatedEmployee = await EmployeeModel.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    );
+      if (existingEmployee) {
+        return res.status(409).json({
+          success: false,
+          message: "Employee with this email already exists",
+        });
+      }
+      employee.email = email.toLowerCase().trim();
+    }
 
+    if (name !== undefined) {
+      employee.name = name.trim();
+    }
+    if (phone !== undefined) {
+      employee.phone = phone || "";
+    }
+    if (position !== undefined) {
+      employee.position = position || "";
+    }
+    if (department !== undefined) {
+      employee.department = department || "";
+    }
+
+    const updatedEmployee = await employee.save();
     return res.status(200).json({
       success: true,
       message: "Employee updated successfully",
       data: updatedEmployee,
     });
   } catch (error) {
-    console.error("Update employee error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to update employee",
@@ -156,13 +160,11 @@ export const deleteEmployee = async (req, res) => {
     }
 
     await EmployeeModel.findByIdAndDelete(id);
-
     return res.status(200).json({
       success: true,
       message: "Employee deleted successfully",
     });
   } catch (error) {
-    console.error("Delete employee error:", error);
     return res.status(500).json({
       success: false,
       message: "Failed to delete employee",

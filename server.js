@@ -15,6 +15,7 @@ const PORT = process.env.PORT
 connectDB();
 
 console.log("Loaded JWT_SECRET:", process.env.JWT_SECRET);
+console.log("Loaded SECRET_KEY:", process.env.SECRET_KEY ? `${process.env.SECRET_KEY.substring(0, 2)}***` : "NOT SET (using default: dev2024)");
 
 const app = express();
 app.use(express.json())
@@ -22,7 +23,7 @@ app.use(express.json())
 app.use(cors({
   origin: ["http://localhost:9000", "https://lamkabill.netlify.app"],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Secret-Key"],
 }));
 
 console.log("CLIENT_URL:", process.env.CLIENT_URL);

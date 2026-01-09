@@ -32,11 +32,16 @@ export const signUp = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Set expiry date to 1 year from now
+    const expiryDate = new Date();
+    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
     const user = new UserModel({
       businessName,
       email,
       password: hashedPassword,
       role: "superadmin", // 👈 IMPORTANT
+      expiryDate,
     });
 
     await user.save();
@@ -68,6 +73,25 @@ export const login = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "Login failed. Please try again",
+      });
+    }
+
+    // Set expiry date if it doesn't exist (for existing users)
+    if (!user.expiryDate) {
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      user.expiryDate = expiryDate;
+      await user.save();
+    }
+
+    // Check if account is expired
+    const now = new Date();
+    const isExpired = user.expiryDate && new Date(user.expiryDate) < now;
+    if (isExpired) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has expired. Please contact the developer to renew.",
+        isExpired: true,
       });
     }
     const jwtToken = jwt.sign(
@@ -419,14 +443,232 @@ export const updateProfile = async (req, res) => {
 
 export const getProfile = async (req, res) => {
   try {
+    // Set expiry date if it doesn't exist (for existing users)
+    if (!req.user.expiryDate) {
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      req.user.expiryDate = expiryDate;
+      await req.user.save();
+    }
+
+    // Check if account is expired
+    const now = new Date();
+    const isExpired = req.user.expiryDate && new Date(req.user.expiryDate) < now;
+
     return res.status(200).json({
       success: true,
-      data: req.user,
+      data: {
+        ...req.user.toObject(),
+        isExpired,
+      },
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch profile",
+      error: error.message,
+    });
+  }
+};
+
+// Get all users (Secret endpoint for developer)
+export const getAllUsersSecret = async (req, res) => {
+  try {
+    // Express normalizes headers to lowercase
+    const secretKey = (req.headers["x-secret-key"] || "").trim();
+    const expectedKey = (process.env.SECRET_KEY || "dev2024").trim();
+
+    // Debug log - check what we're receiving
+    console.log("=== SECRET KEY CHECK ===");
+    console.log("Received header:", secretKey || "EMPTY/NOT FOUND");
+    console.log("Expected key:", expectedKey);
+    console.log("Keys match:", secretKey === expectedKey);
+    console.log("Received length:", secretKey.length);
+    console.log("Expected length:", expectedKey.length);
+    console.log("All request headers:", Object.keys(req.headers));
+    console.log("x-secret-key header value:", req.headers["x-secret-key"]);
+    console.log("=========================");
+
+    if (!secretKey) {
+      console.log("ERROR: No secret key header found!");
+      return res.status(401).json({
+        success: false,
+        message: "Secret key header missing",
+      });
+    }
+
+    if (secretKey !== expectedKey) {
+      console.log("ERROR: Secret keys do not match!");
+      return res.status(401).json({
+        success: false,
+        message: "Invalid secret key",
+      });
+    }
+
+    // Only fetch superadmin users (real users, not cashiers)
+    const users = await UserModel.find({ role: "superadmin" })
+      .select("-password -resetToken -resetTokenExpire")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    console.error("Get all users secret error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+      error: error.message,
+    });
+  }
+};
+
+// Extend user expiry (Secret endpoint for developer)
+export const extendUserExpirySecret = async (req, res) => {
+  try {
+    // Express normalizes headers to lowercase, but also check original case
+    const secretKey = (req.headers["x-secret-key"] || req.headers["X-Secret-Key"] || "").trim();
+    const expectedKey = (process.env.SECRET_KEY || "dev2024").trim();
+
+    if (!secretKey || secretKey !== expectedKey) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid secret key",
+      });
+    }
+
+    const { userId } = req.params;
+    const { extendYears, expiryDate } = req.body;
+
+    if (!extendYears && !expiryDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Either extendYears or expiryDate is required",
+      });
+    }
+
+    if (extendYears && extendYears < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "extendYears must be at least 1",
+      });
+    }
+
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    let newExpiryDate;
+
+    if (expiryDate) {
+      // Set specific expiry date
+      newExpiryDate = new Date(expiryDate);
+      if (isNaN(newExpiryDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid expiry date format",
+        });
+      }
+    } else if (extendYears) {
+      // Extend from current expiry date or from now if expired
+      const currentExpiry = user.expiryDate || new Date();
+      const baseDate = new Date(currentExpiry) > new Date() ? currentExpiry : new Date();
+      newExpiryDate = new Date(baseDate);
+      newExpiryDate.setFullYear(newExpiryDate.getFullYear() + extendYears);
+    }
+
+    user.expiryDate = newExpiryDate;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "User expiry date extended successfully",
+      data: {
+        userId: user._id,
+        email: user.email,
+        expiryDate: user.expiryDate,
+        isExpired: newExpiryDate < new Date(),
+      },
+    });
+  } catch (error) {
+    console.error("Extend user expiry secret error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to extend user expiry date",
+      error: error.message,
+    });
+  }
+};
+
+// Update user expiry date (Admin only)
+export const updateUserExpiry = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { expiryDate, extendYears } = req.body;
+
+    // Only superadmin can update expiry dates
+    if (req.user.role !== "superadmin") {
+      return res.status(403).json({
+        success: false,
+        message: "Only superadmin can update expiry dates",
+      });
+    }
+
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    let newExpiryDate;
+
+    if (extendYears) {
+      // Extend from current expiry date or from now if expired
+      const currentExpiry = user.expiryDate || new Date();
+      const baseDate = new Date(currentExpiry) > new Date() ? currentExpiry : new Date();
+      newExpiryDate = new Date(baseDate);
+      newExpiryDate.setFullYear(newExpiryDate.getFullYear() + extendYears);
+    } else if (expiryDate) {
+      // Set specific expiry date
+      newExpiryDate = new Date(expiryDate);
+      if (isNaN(newExpiryDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid expiry date format",
+        });
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Either expiryDate or extendYears is required",
+      });
+    }
+
+    user.expiryDate = newExpiryDate;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "User expiry date updated successfully",
+      data: {
+        userId: user._id,
+        email: user.email,
+        expiryDate: user.expiryDate,
+        isExpired: newExpiryDate < new Date(),
+      },
+    });
+  } catch (error) {
+    console.error("Update user expiry error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update user expiry date",
       error: error.message,
     });
   }

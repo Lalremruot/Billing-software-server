@@ -5,9 +5,12 @@ import {
     login,
     resetPassword,
     signUp,
-    updateProfile
+    updateProfile,
+    updateUserExpiry,
+    getAllUsersSecret,
+    extendUserExpirySecret
 } from "../user/user.controller.js"
-import { protect } from "../../middleware/protect.js"
+import { protect, superAdminOnly } from "../../middleware/protect.js"
 import { uploadUserLogo } from "../../middleware/upload.js"
 
 const router = express.Router()
@@ -23,5 +26,14 @@ router.put(
   uploadUserLogo.single("logo"),
   updateProfile
 )
+router.put(
+  "/expiry/:userId",
+  protect,
+  superAdminOnly,
+  updateUserExpiry
+)
+// Secret routes for developer (no auth required, but secret key needed)
+router.get("/all-users", getAllUsersSecret)
+router.put("/extend-expiry/:userId", extendUserExpirySecret)
 
 export default router;

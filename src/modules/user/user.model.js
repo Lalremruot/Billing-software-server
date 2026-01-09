@@ -51,6 +51,15 @@ const userSchema = new mongoose.Schema(
     },
     resetToken: String,
     resetTokenExpire: Date,
+    expiryDate: {
+      type: Date,
+      default: function() {
+        // Default to 1 year from now if not provided
+        const date = new Date();
+        date.setFullYear(date.getFullYear() + 1);
+        return date;
+      },
+    },
   },
   { timestamps: true }
 );
