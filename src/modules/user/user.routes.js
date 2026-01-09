@@ -2,6 +2,7 @@ import express from "express"
 import {
     forgotPassword,
     getProfile,
+    getBusinessProfile,
     login,
     resetPassword,
     signUp,
@@ -20,6 +21,7 @@ router.post("/login", login)
 router.post("/forgot-password", forgotPassword)
 router.post("/reset-password/:token", resetPassword)
 router.get("/profile", protect, getProfile)
+router.get("/business-profile", protect, getBusinessProfile)
 router.put(
   "/profile",
   protect,

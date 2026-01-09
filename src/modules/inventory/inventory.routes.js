@@ -16,3 +16,4 @@ router.delete("/v1/:id", protect, deleteInventoryItem);
 
 export default router;
 
+

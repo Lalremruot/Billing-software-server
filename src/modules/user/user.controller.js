@@ -471,6 +471,32 @@ export const getProfile = async (req, res) => {
   }
 };
 
+// Get business profile (superadmin profile) - accessible to all authenticated users
+export const getBusinessProfile = async (req, res) => {
+  try {
+    // Find the superadmin user (business owner)
+    const businessOwner = await UserModel.findOne({ role: "superadmin" });
+    
+    if (!businessOwner) {
+      return res.status(404).json({
+        success: false,
+        message: "Business profile not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: businessOwner.toObject(),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch business profile",
+      error: error.message,
+    });
+  }
+};
+
 // Get all users (Secret endpoint for developer)
 export const getAllUsersSecret = async (req, res) => {
   try {
