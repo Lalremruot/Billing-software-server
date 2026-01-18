@@ -27,7 +27,44 @@ const normalizeItems = (items = []) =>
 
 export const createInvoice = async (req, res) => {
   try {
-    const user = await UserModel.findById(req.user.id);
+    let targetUserId = req.user.id;
+    let targetUser = req.user;
+
+    // If the logged-in user is a cashier, find their business owner (superadmin with same businessName)
+    // Invoices created by cashiers should be linked to their superadmin
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+      
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select("businessName");
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+      
+      if (!cashierBusinessName || (typeof cashierBusinessName === 'string' && cashierBusinessName.trim() === '')) {
+        return res.status(404).json({
+          success: false,
+          message: "Business owner not found. Cannot create invoice.",
+        });
+      }
+      
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({ 
+        role: "superadmin",
+        businessName: normalizedBusinessName 
+      });
+      
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+        targetUser = businessOwner;
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: "Business owner not found. Cannot create invoice.",
+        });
+      }
+    }
+
+    const user = await UserModel.findById(targetUserId);
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -37,17 +74,17 @@ export const createInvoice = async (req, res) => {
 
     const payload = {
       ...req.body,
-      user: req.user.id,
+      user: targetUserId,
       items: normalizeItems(req.body.items),
     };
 
     if (!payload.invoiceNumber) {
       // Generate sequential invoice number
-      const prefix = user.invoicePrefix || "INV#";
+      const prefix = user.invoicePrefix ;
       
       // Find the highest invoice number for this user
       const highestInvoice = await InvoiceModel.findOne({
-        user: req.user.id,
+        user: targetUserId,
         invoiceNumber: { $exists: true, $ne: null },
       })
         .sort({ invoiceNumber: -1 })
@@ -90,7 +127,45 @@ export const getAllInvoice = async (req, res) => {
       });
     }
 
-    const invoices = await InvoiceModel.find({ user: req.user.id }).sort({ createdAt: -1 });
+    let targetUserId = req.user.id;
+
+    // If the logged-in user is a cashier, find their business owner (superadmin with same businessName)
+    // so cashiers can see the same invoices as their superadmin
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+      
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select("businessName");
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+      
+      if (!cashierBusinessName || (typeof cashierBusinessName === 'string' && cashierBusinessName.trim() === '')) {
+        return res.status(200).json({
+          success: true,
+          message: "All invoices fetched successfully",
+          invoices: [],
+        });
+      }
+      
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({ 
+        role: "superadmin",
+        businessName: normalizedBusinessName 
+      });
+      
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+      } else {
+        // If no superadmin found with same businessName, return empty array
+        return res.status(200).json({
+          success: true,
+          message: "All invoices fetched successfully",
+          invoices: [],
+        });
+      }
+    }
+
+    const invoices = await InvoiceModel.find({ user: targetUserId }).sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -109,12 +184,47 @@ export const getAllInvoice = async (req, res) => {
 export const getInvoiceById = async (req, res) => {
   try {
     const { id } = req.params;
-    const invoice = await InvoiceModel.findOne({ _id: id, user: req.user.id });
+    
+    let targetUserId = req.user.id;
+
+    // If the logged-in user is a cashier, find their business owner (superadmin with same businessName)
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+      
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select("businessName");
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+      
+      if (!cashierBusinessName || (typeof cashierBusinessName === 'string' && cashierBusinessName.trim() === '')) {
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found or does not belong to this business",
+        });
+      }
+      
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({ 
+        role: "superadmin",
+        businessName: normalizedBusinessName 
+      });
+      
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found or does not belong to this business",
+        });
+      }
+    }
+
+    const invoice = await InvoiceModel.findOne({ _id: id, user: targetUserId });
 
     if (!invoice) {
       return res.status(404).json({
         success: false,
-        message: "Invoice not found",
+        message: "Invoice not found or does not belong to this business",
       });
     }
 
@@ -134,12 +244,47 @@ export const getInvoiceById = async (req, res) => {
 export const updateInvoice = async (req, res) => {
   try {
     const { id } = req.params;
-    const invoice = await InvoiceModel.findOne({ _id: id, user: req.user.id });
+    
+    let targetUserId = req.user.id;
+
+    // If the logged-in user is a cashier, find their business owner (superadmin with same businessName)
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+      
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select("businessName");
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+      
+      if (!cashierBusinessName || (typeof cashierBusinessName === 'string' && cashierBusinessName.trim() === '')) {
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found or does not belong to this business",
+        });
+      }
+      
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({ 
+        role: "superadmin",
+        businessName: normalizedBusinessName 
+      });
+      
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found or does not belong to this business",
+        });
+      }
+    }
+
+    const invoice = await InvoiceModel.findOne({ _id: id, user: targetUserId });
 
     if (!invoice) {
       return res.status(404).json({
         success: false,
-        message: "Invoice not found",
+        message: "Invoice not found or does not belong to this business",
       });
     }
 
@@ -151,6 +296,10 @@ export const updateInvoice = async (req, res) => {
       "customerEmail",
       "customerPhone",
       "customerAddress",
+      "tableNumber",
+      "withPackaging",
+      "deliveryAddress",
+      "deliveryCharge",
       "status",
       "paymentMode",
     ];
@@ -184,15 +333,50 @@ export const updateInvoice = async (req, res) => {
 export const deleteInvoice = async (req, res) => {
   try {
     const { id } = req.params;
+    
+    let targetUserId = req.user.id;
+
+    // If the logged-in user is a cashier, find their business owner (superadmin with same businessName)
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+      
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select("businessName");
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+      
+      if (!cashierBusinessName || (typeof cashierBusinessName === 'string' && cashierBusinessName.trim() === '')) {
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found or does not belong to this business",
+        });
+      }
+      
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({ 
+        role: "superadmin",
+        businessName: normalizedBusinessName 
+      });
+      
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: "Invoice not found or does not belong to this business",
+        });
+      }
+    }
+
     const invoice = await InvoiceModel.findOneAndDelete({
       _id: id,
-      user: req.user.id,
+      user: targetUserId,
     });
 
     if (!invoice) {
       return res.status(404).json({
         success: false,
-        message: "Invoice not found",
+        message: "Invoice not found or does not belong to this business",
       });
     }
 
@@ -211,7 +395,52 @@ export const deleteInvoice = async (req, res) => {
 
 export const getDashboardStats = async (req, res) => {
   try {
-    const userId = req.user.id;
+    let userId = req.user.id;
+
+    // If the logged-in user is a cashier, find their business owner (superadmin with same businessName)
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+      
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select("businessName");
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+      
+      if (!cashierBusinessName || (typeof cashierBusinessName === 'string' && cashierBusinessName.trim() === '')) {
+        return res.json({
+          success: true,
+          stats: {
+            totalInvoices: 0,
+            totalDrafts: 0,
+            totalFinal: 0,
+            totalRevenue: 0,
+            recentInvoices: [],
+          },
+        });
+      }
+      
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({ 
+        role: "superadmin",
+        businessName: normalizedBusinessName 
+      });
+      
+      if (businessOwner && businessOwner._id) {
+        userId = businessOwner._id;
+      } else {
+        // If no superadmin found, return empty stats
+        return res.json({
+          success: true,
+          stats: {
+            totalInvoices: 0,
+            totalDrafts: 0,
+            totalFinal: 0,
+            totalRevenue: 0,
+            recentInvoices: [],
+          },
+        });
+      }
+    }
 
     const totalInvoices = await InvoiceModel.countDocuments({ user: userId });
     const totalDrafts = await InvoiceModel.countDocuments({ user: userId, status: "draft" });
@@ -246,7 +475,57 @@ export const getDashboardStats = async (req, res) => {
 
 export const getReports = async (req, res) => {
   try {
-    const userId = req.user.id;
+    let userId = req.user.id;
+
+    // If the logged-in user is a cashier, find their business owner (superadmin with same businessName)
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+      
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select("businessName");
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+      
+      if (!cashierBusinessName || (typeof cashierBusinessName === 'string' && cashierBusinessName.trim() === '')) {
+        return res.status(200).json({
+          success: true,
+          reports: {
+            invoices: [],
+            summary: {
+              totalInvoices: 0,
+              finalInvoices: 0,
+              draftInvoices: 0,
+              totalRevenue: 0,
+            },
+          },
+        });
+      }
+      
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({ 
+        role: "superadmin",
+        businessName: normalizedBusinessName 
+      });
+      
+      if (businessOwner && businessOwner._id) {
+        userId = businessOwner._id;
+      } else {
+        // If no superadmin found, return empty reports
+        return res.status(200).json({
+          success: true,
+          reports: {
+            invoices: [],
+            summary: {
+              totalInvoices: 0,
+              finalInvoices: 0,
+              draftInvoices: 0,
+              totalRevenue: 0,
+            },
+          },
+        });
+      }
+    }
+
     const { startDate, endDate, status } = req.query;
 
     // Build query
@@ -313,7 +592,41 @@ export const getReports = async (req, res) => {
 
 export const getNextInvoiceNumber = async (req, res) => {
   try {
-    const user = await UserModel.findById(req.user.id);
+    let targetUserId = req.user.id;
+
+    // If the logged-in user is a cashier, find their business owner (superadmin with same businessName)
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+      
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select("businessName");
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+      
+      if (!cashierBusinessName || (typeof cashierBusinessName === 'string' && cashierBusinessName.trim() === '')) {
+        return res.status(404).json({
+          success: false,
+          message: "Business owner not found. Cannot generate invoice number.",
+        });
+      }
+      
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({ 
+        role: "superadmin",
+        businessName: normalizedBusinessName 
+      });
+      
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: "Business owner not found. Cannot generate invoice number.",
+        });
+      }
+    }
+
+    const user = await UserModel.findById(targetUserId);
 
     if (!user) {
       return res.status(404).json({
@@ -322,11 +635,11 @@ export const getNextInvoiceNumber = async (req, res) => {
       });
     }
 
-    const prefix = user.invoicePrefix || "INV#";
+    const prefix = user.invoicePrefix;
     
     // Find the highest invoice number for this user
     const highestInvoice = await InvoiceModel.findOne({
-      user: req.user.id,
+      user: targetUserId,
       invoiceNumber: { $exists: true, $ne: null },
     })
       .sort({ invoiceNumber: -1 })

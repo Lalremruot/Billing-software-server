@@ -19,6 +19,10 @@ const invoiceSchema = new mongoose.Schema({
     default: "cash",
   },
   customerAddress: { type: String, required: false },
+  tableNumber: { type: Number, required: false, min: 1, max: 15 },
+  withPackaging: { type: Boolean, default: false },
+  deliveryAddress: { type: String, required: false },
+  deliveryCharge: { type: Number, default: 0, min: 0 },
   items: [
     {
       name: { type: String, required: true },
@@ -50,11 +54,11 @@ invoiceSchema.pre("save", async function (next) {
 
       // Format with leading zeros (5 digits: 00001, 00002, etc.)
       const formattedNumber = String(nextNumber).padStart(5, "0");
-      invoice.invoiceNumber = `INV#${formattedNumber}`;
+      invoice.invoiceNumber = `INV${formattedNumber}`;
     } catch (error) {
       // If error occurs, fallback to timestamp-based number
       const fallbackNumber = String(Date.now()).slice(-5).padStart(5, "0");
-      invoice.invoiceNumber = `INV#${fallbackNumber}`;
+      invoice.invoiceNumber = `INV${fallbackNumber}`;
     }
   }
   next();

@@ -3,8 +3,21 @@ import bcrypt from "bcrypt";
 
 export const getAllCashiers = async (req, res) => {
   try {
-    // Only super admin can view all cashiers
-    const cashiers = await UserModel.find({ role: "cashier" })
+    // Only super admin can view cashiers
+    // Filter cashiers by the logged-in superadmin's businessName
+    const businessName = req.user?.businessName;
+    
+    if (!businessName) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Business name not found",
+      });
+    }
+
+    const cashiers = await UserModel.find({ 
+      role: "cashier",
+      businessName: businessName 
+    })
       .select("-password") // Don't send password
       .sort({ createdAt: -1 });
 
@@ -25,13 +38,26 @@ export const getAllCashiers = async (req, res) => {
 export const deleteCashier = async (req, res) => {
   try {
     const { id } = req.params;
+    const businessName = req.user?.businessName;
 
-    const cashier = await UserModel.findOne({ _id: id, role: "cashier" });
+    if (!businessName) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Business name not found",
+      });
+    }
+
+    // Only allow deleting cashiers with the same businessName as the logged-in superadmin
+    const cashier = await UserModel.findOne({ 
+      _id: id, 
+      role: "cashier",
+      businessName: businessName 
+    });
 
     if (!cashier) {
       return res.status(404).json({
         success: false,
-        message: "Cashier not found",
+        message: "Cashier not found or you don't have permission to delete this cashier",
       });
     }
 
@@ -54,13 +80,26 @@ export const updateCashier = async (req, res) => {
   try {
     const { id } = req.params;
     const { email, permissions, password } = req.body;
+    const businessName = req.user?.businessName;
 
-    const cashier = await UserModel.findOne({ _id: id, role: "cashier" });
+    if (!businessName) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized: Business name not found",
+      });
+    }
+
+    // Only allow updating cashiers with the same businessName as the logged-in superadmin
+    const cashier = await UserModel.findOne({ 
+      _id: id, 
+      role: "cashier",
+      businessName: businessName 
+    });
 
     if (!cashier) {
       return res.status(404).json({
         success: false,
-        message: "Cashier not found",
+        message: "Cashier not found or you don't have permission to update this cashier",
       });
     }
 

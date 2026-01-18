@@ -21,12 +21,12 @@ export const signUp = async (req, res) => {
       });
     }
 
-    // 🔒 CHECK IF SUPER ADMIN ALREADY EXISTS
-    const superAdminExists = await UserModel.findOne({ role: "superadmin" });
-    if (superAdminExists) {
-      return res.status(403).json({
+    // Check if email already exists
+    const existingUser = await UserModel.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(409).json({
         success: false,
-        message: "Super Admin already exists. Signup is disabled.",
+        message: "Email already registered. Please login instead.",
       });
     }
 
@@ -105,7 +105,8 @@ export const login = async (req, res) => {
       token: jwtToken,
       email: user.email,
       role: user.role,
-      permissions: user.permissions,
+      permissions: user.permissions || [],
+      businessName: user.businessName || "",
     });
   } catch (error) {
     res.status(500).json({
@@ -397,7 +398,7 @@ export const resetPassword = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { businessName, ownerName, phone, email, address } = req.body;
+    const { businessName, ownerName, phone, email, address, invoicePrefix } = req.body;
 
     const updates = {};
 
@@ -405,6 +406,7 @@ export const updateProfile = async (req, res) => {
     if (ownerName !== undefined) updates.ownerName = ownerName;
     if (phone !== undefined) updates.phone = phone;
     if (address !== undefined) updates.address = address;
+    if (invoicePrefix !== undefined) updates.invoicePrefix = invoicePrefix.trim();
 
     if (email !== undefined && email !== req.user.email) {
       const existingEmail = await UserModel.findOne({ email });
@@ -417,7 +419,11 @@ export const updateProfile = async (req, res) => {
       updates.email = email;
     }
 
-    if (req.file) {
+    // Use uploaded file URL from S3 if available, otherwise check for local file
+    if (req.uploadedFileUrl) {
+      updates.logo = req.uploadedFileUrl;
+    } else if (req.file) {
+      // Fallback to local file upload if S3 is not used
       updates.logo = `uploads/users/${req.file.filename}`;
     }
 
@@ -472,21 +478,41 @@ export const getProfile = async (req, res) => {
 };
 
 // Get business profile (superadmin profile) - accessible to all authenticated users
+// Returns the logged-in superadmin's profile, or the logged-in user's business owner if they're a cashier
 export const getBusinessProfile = async (req, res) => {
   try {
-    // Find the superadmin user (business owner)
-    const businessOwner = await UserModel.findOne({ role: "superadmin" });
+    // If the logged-in user is a superadmin, return their own profile
+    // req.user is already the full document from protect middleware, so we can use it directly
+    if (req.user && req.user.role === "superadmin") {
+      return res.status(200).json({
+        success: true,
+        data: req.user.toObject ? req.user.toObject() : req.user,
+      });
+    }
     
-    if (!businessOwner) {
-      return res.status(404).json({
-        success: false,
-        message: "Business profile not found",
+    // If the logged-in user is a cashier, find their business owner (superadmin with same businessName)
+    if (req.user && req.user.businessName) {
+      const businessOwner = await UserModel.findOne({ 
+        role: "superadmin",
+        businessName: req.user.businessName 
+      });
+      
+      if (!businessOwner) {
+        return res.status(404).json({
+          success: false,
+          message: "Business profile not found",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: businessOwner.toObject(),
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      data: businessOwner.toObject(),
+    return res.status(404).json({
+      success: false,
+      message: "Business profile not found",
     });
   } catch (error) {
     return res.status(500).json({

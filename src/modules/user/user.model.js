@@ -32,7 +32,7 @@ const userSchema = new mongoose.Schema(
     },
     invoicePrefix: {
       type: String,
-      default: "ACK#",
+      default: "INV",
       trim: true,
     },
     password: {

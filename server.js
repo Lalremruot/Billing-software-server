@@ -2,13 +2,16 @@ import dotenv from "dotenv";
 dotenv.config() 
 import express from "express"
 import cors from "cors"
+import { createServer } from "http";
 import { connectDB } from "./src/config/db.js";
+import { initializeSocket } from "./src/socket/socketServer.js";
 import userAuthRoute from "./src/modules/user/user.routes.js"
 import invoiceRoute from "./src/modules/invoice/invoice.routes.js"
 import productRoute from "./src/modules/product/product.routes.js"
 import createCashierRoute from "./src/modules/cashier/cashier.routes.js"
 import employeeRoute from "./src/modules/employee/employee.routes.js"
 import inventoryRoute from "./src/modules/inventory/inventory.routes.js"
+import qrcodeRoute from "./src/modules/qrcode/qrcode.routes.js"
 
 const PORT = process.env.PORT
 
@@ -21,7 +24,26 @@ const app = express();
 app.use(express.json())
 
 app.use(cors({
-  origin: ["http://localhost:9000", "https://lamkabill.netlify.app"],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, or curl)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      "http://localhost:9000",
+      "http://localhost:5173",
+      "https://lamkabill.netlify.app",
+      "http://192.168.29.109:9000",
+      process.env.CLIENT_URL
+    ].filter(Boolean); // Remove undefined values
+    
+    if (allowedOrigins.includes(origin) || allowedOrigins.some(allowed => origin.includes(allowed))) {
+      callback(null, true);
+    } else {
+      // For public endpoints, allow all origins
+      callback(null, true);
+    }
+  },
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "X-Secret-Key"],
 }));
@@ -40,10 +62,17 @@ app.use("/api/product", productRoute)
 app.use("/api/cashier", createCashierRoute)
 app.use("/api/employee", employeeRoute)
 app.use("/api/inventory", inventoryRoute)
+app.use("/api/qrcode", qrcodeRoute)
 
+// Create HTTP server
+const httpServer = createServer(app);
 
-app.listen(PORT, () => {
+// Initialize Socket.io
+initializeSocket(httpServer);
+
+httpServer.listen(PORT, () => {
     console.log(`Server is listening on PORT ${PORT}`)
+    console.log(`Socket.io server initialized`)
 })
 
 

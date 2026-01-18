@@ -12,7 +12,7 @@ import {
     extendUserExpirySecret
 } from "../user/user.controller.js"
 import { protect, superAdminOnly } from "../../middleware/protect.js"
-import { uploadUserLogo } from "../../middleware/upload.js"
+import { uploadToMinio, uploadUserLogo } from "../../middleware/upload.js"
 
 const router = express.Router()
 
@@ -25,8 +25,9 @@ router.get("/business-profile", protect, getBusinessProfile)
 router.put(
   "/profile",
   protect,
-  uploadUserLogo.single("logo"),
-  updateProfile
+  uploadUserLogo.single("logo"), // multer
+  uploadToMinio,                 // sends file to MinIO
+  updateProfile                   // your logic
 )
 router.put(
   "/expiry/:userId",

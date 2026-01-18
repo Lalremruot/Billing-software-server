@@ -12,6 +12,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.969.0",
+    "@aws-sdk/credential-providers": "^3.969.0",
     "axios": "^1.13.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
@@ -24,6 +26,9 @@
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
     "nodemailer": "^6.9.8",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
   }
 }
