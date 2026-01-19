@@ -30,6 +30,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    licNo: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    fssaiNo: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     invoicePrefix: {
       type: String,
       default: "INV",

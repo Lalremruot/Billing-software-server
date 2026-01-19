@@ -398,7 +398,7 @@ export const resetPassword = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { businessName, ownerName, phone, email, address, invoicePrefix } = req.body;
+    const { businessName, ownerName, phone, email, address, licNo, fssaiNo, invoicePrefix } = req.body;
 
     const updates = {};
 
@@ -406,6 +406,8 @@ export const updateProfile = async (req, res) => {
     if (ownerName !== undefined) updates.ownerName = ownerName;
     if (phone !== undefined) updates.phone = phone;
     if (address !== undefined) updates.address = address;
+    if (licNo !== undefined) updates.licNo = licNo.trim();
+    if (fssaiNo !== undefined) updates.fssaiNo = fssaiNo.trim();
     if (invoicePrefix !== undefined) updates.invoicePrefix = invoicePrefix.trim();
 
     if (email !== undefined && email !== req.user.email) {
