@@ -27,6 +27,7 @@ import {
   createOrder,
   getAllOrders,
   getOrdersByTableId,
+  getOrdersByTableIdPublic,
   getOrderById,
   updateOrderStatus,
   deleteOrder,
@@ -60,6 +61,7 @@ router.delete("/menu/v1/:id", protect, checkPermission("qrcodemenu:view"), delet
 
 // Order routes
 router.post("/order/v1", createOrder); // Public - no auth required
+router.get("/order/public/table/:tableId", getOrdersByTableIdPublic); // Public - for customer order history
 router.get("/order/v1", protect, checkPermission("qrcodemenu:view"), getAllOrders);
 router.get("/order/v1/table/:tableId", protect, checkPermission("qrcodemenu:view"), getOrdersByTableId);
 router.get("/order/v1/:id", protect, checkPermission("qrcodemenu:view"), getOrderById);

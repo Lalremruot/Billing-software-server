@@ -10,7 +10,7 @@ import invoiceRoute from "./src/modules/invoice/invoice.routes.js"
 import productRoute from "./src/modules/product/product.routes.js"
 import createCashierRoute from "./src/modules/cashier/cashier.routes.js"
 import employeeRoute from "./src/modules/employee/employee.routes.js"
-import inventoryRoute from "./src/modules/inventory/inventory.routes.js"
+import expensesRoute from "./src/modules/expenses/expenses.routes.js"
 import qrcodeRoute from "./src/modules/qrcode/qrcode.routes.js"
 
 const PORT = process.env.PORT
@@ -32,6 +32,7 @@ app.use(cors({
       "http://localhost:9000",
       "http://localhost:5173",
       "https://lamkabill.netlify.app",
+      "https://arsicloudkitchen.in",
       "http://192.168.29.109:9000",
       process.env.CLIENT_URL
     ].filter(Boolean); // Remove undefined values
@@ -61,7 +62,7 @@ app.use("/api/invoice", invoiceRoute)
 app.use("/api/product", productRoute)
 app.use("/api/cashier", createCashierRoute)
 app.use("/api/employee", employeeRoute)
-app.use("/api/inventory", inventoryRoute)
+app.use("/api/expenses", expensesRoute)
 app.use("/api/qrcode", qrcodeRoute)
 
 // Create HTTP server

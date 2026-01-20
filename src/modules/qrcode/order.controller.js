@@ -195,7 +195,62 @@ export const getAllOrders = async (req, res) => {
   }
 };
 
-// Get Orders by Table ID
+// Get Orders by Table ID (Public - for customer order history)
+export const getOrdersByTableIdPublic = async (req, res) => {
+  try {
+    const { tableId } = req.params;
+    
+    if (!tableId || !tableId.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Table ID is required",
+      });
+    }
+
+    // Verify table exists and is active
+    const qrcode = await QRCodeModel.findOne({
+      tableId: tableId.trim(),
+      isActive: true,
+    });
+
+    if (!qrcode) {
+      return res.status(404).json({
+        success: false,
+        message: "Table not found or inactive",
+      });
+    }
+
+    // Get orders for this table (public access - customers can see their table's orders)
+    const orders = await OrderModel.find({
+      tableId: tableId.trim(),
+      user: qrcode.user,
+    })
+      .populate("items.menuItemId", "itemName image")
+      .sort({ createdAt: -1 })
+      .select("-__v"); // Exclude version field
+
+    // Ensure dates are properly serialized
+    const serializedOrders = orders.map(order => ({
+      ...order.toObject(),
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Orders fetched successfully",
+      orders: serializedOrders,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch orders",
+      error: error.message,
+    });
+  }
+};
+
+// Get Orders by Table ID (Protected - for admin)
 export const getOrdersByTableId = async (req, res) => {
   try {
     const { tableId } = req.params;
