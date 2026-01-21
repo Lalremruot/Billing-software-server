@@ -33,7 +33,8 @@ app.use(cors({
       "http://localhost:5173",
       "https://lamkabill.netlify.app",
       "https://arsicloudkitchen.in",
-      "http://192.168.29.109:9000",
+      "http://192.168.1.8:9000",
+      "http://192.168.29.110:9000",
       process.env.CLIENT_URL
     ].filter(Boolean); // Remove undefined values
     

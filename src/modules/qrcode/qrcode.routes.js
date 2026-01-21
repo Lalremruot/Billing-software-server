@@ -1,5 +1,5 @@
 import express from "express";
-import { protect, checkPermission } from "../../middleware/protect.js";
+import { protect, checkPermission, identifyTenant } from "../../middleware/protect.js";
 import {
   createQRCode,
   getAllQRCodes,
@@ -7,6 +7,7 @@ import {
   getQRCodeByTableId,
   updateQRCode,
   deleteQRCode,
+  getQRCodeByTableIdPublic,
 } from "./qrcode.controller.js";
 import {
   createMenuItem,
@@ -38,12 +39,14 @@ const router = express.Router();
 // QR Code routes - require authentication
 router.post("/v1", protect, checkPermission("qrcodemenu:view"), createQRCode);
 router.get("/v1", protect, checkPermission("qrcodemenu:view"), getAllQRCodes);
-router.get("/v1/:id", protect, checkPermission("qrcodemenu:view"), getQRCodeById);
+// router.get("/public/table/:tableId", identifyTenant, getQRCodeByTableId);
+router.get("/v1/:id", protect,checkPermission("qrcodemenu:view"), getQRCodeById);
 router.put("/v1/:id", protect, checkPermission("qrcodemenu:view"), updateQRCode);
 router.delete("/v1/:id", protect, checkPermission("qrcodemenu:view"), deleteQRCode);
+router.get("/public/table/:tableId", identifyTenant, getQRCodeByTableIdPublic);
 
 // Public route to get QR code and menu by table ID (no auth required)
-router.get("/public/table/:tableId", getQRCodeByTableId);
+// router.get("/public/table/:tableId", getQRCodeByTableId);
 
 // Category routes - require authentication
 router.post("/category/v1", protect, checkPermission("qrcodemenu:view"), createCategory);

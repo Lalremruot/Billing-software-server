@@ -398,7 +398,17 @@ export const resetPassword = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { businessName, ownerName, phone, email, address, licNo, fssaiNo, invoicePrefix } = req.body;
+    const {
+      businessName,
+      ownerName,
+      phone,
+      email,
+      address,
+      licNo,
+      fssaiNo,
+      invoicePrefix,
+      domain, // ✅ add domain here
+    } = req.body;
 
     const updates = {};
 
@@ -409,6 +419,22 @@ export const updateProfile = async (req, res) => {
     if (licNo !== undefined) updates.licNo = licNo.trim();
     if (fssaiNo !== undefined) updates.fssaiNo = fssaiNo.trim();
     if (invoicePrefix !== undefined) updates.invoicePrefix = invoicePrefix.trim();
+
+    // Handle domain update
+    if (domain !== undefined) {
+      const sanitizedDomain = domain.toLowerCase().trim();
+
+      // Check if domain already exists for another user
+      const existingDomain = await UserModel.findOne({ domain: sanitizedDomain });
+      if (existingDomain && existingDomain._id.toString() !== req.user._id.toString()) {
+        return res.status(409).json({
+          success: false,
+          message: "Domain already in use by another user.",
+        });
+      }
+
+      updates.domain = sanitizedDomain;
+    }
 
     if (email !== undefined && email !== req.user.email) {
       const existingEmail = await UserModel.findOne({ email });
@@ -425,7 +451,6 @@ export const updateProfile = async (req, res) => {
     if (req.uploadedFileUrl) {
       updates.logo = req.uploadedFileUrl;
     } else if (req.file) {
-      // Fallback to local file upload if S3 is not used
       updates.logo = `uploads/users/${req.file.filename}`;
     }
 
@@ -448,6 +473,7 @@ export const updateProfile = async (req, res) => {
     });
   }
 };
+
 
 export const getProfile = async (req, res) => {
   try {
@@ -531,17 +557,6 @@ export const getAllUsersSecret = async (req, res) => {
     // Express normalizes headers to lowercase
     const secretKey = (req.headers["x-secret-key"] || "").trim();
     const expectedKey = (process.env.SECRET_KEY || "dev2024").trim();
-
-    // Debug log - check what we're receiving
-    console.log("=== SECRET KEY CHECK ===");
-    console.log("Received header:", secretKey || "EMPTY/NOT FOUND");
-    console.log("Expected key:", expectedKey);
-    console.log("Keys match:", secretKey === expectedKey);
-    console.log("Received length:", secretKey.length);
-    console.log("Expected length:", expectedKey.length);
-    console.log("All request headers:", Object.keys(req.headers));
-    console.log("x-secret-key header value:", req.headers["x-secret-key"]);
-    console.log("=========================");
 
     if (!secretKey) {
       console.log("ERROR: No secret key header found!");

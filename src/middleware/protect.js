@@ -50,3 +50,28 @@ export const checkPermission = (permission) => {
   };
 };
 
+export const identifyTenant = async (req, res, next) => {
+  try {
+    const host = req.hostname; // e.g., "arsicloudkitchen.in"
+
+    // Find the user that owns this domain
+    const tenant = await UserModel.findOne({ domain: host }).select("-password");
+
+    if (!tenant) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `Tenant not found for domain: ${host}` 
+      });
+    }
+
+    req.tenant = tenant; // attach tenant info to request
+    next();
+  } catch (error) {
+    return res.status(500).json({ 
+      success: false, 
+      message: "Tenant identification failed", 
+      error: error.message 
+    });
+  }
+};
+

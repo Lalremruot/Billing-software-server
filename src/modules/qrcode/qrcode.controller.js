@@ -15,22 +15,22 @@ const getTargetUserId = async (req) => {
 
   if (req.user.role === "cashier") {
     let cashierBusinessName = req.user.businessName;
-    
+
     if (!cashierBusinessName) {
       const cashierDoc = await UserModel.findById(req.user.id).select("businessName");
       cashierBusinessName = cashierDoc?.businessName;
     }
-    
+
     if (!cashierBusinessName || (typeof cashierBusinessName === 'string' && cashierBusinessName.trim() === '')) {
       return null;
     }
-    
+
     const normalizedBusinessName = String(cashierBusinessName).trim();
-    const businessOwner = await UserModel.findOne({ 
+    const businessOwner = await UserModel.findOne({
       role: "superadmin",
       businessName: normalizedBusinessName
     });
-    
+
     if (businessOwner && businessOwner._id) {
       targetUserId = businessOwner._id;
     } else {
@@ -72,51 +72,46 @@ export const createQRCode = async (req, res) => {
 
     // Generate QR code URL that points to the menu page using the auto-generated tableId
     // Always use CLIENT_URL from environment variable
-    let frontendUrl = process.env.CLIENT_URL;
-    
-    if (!frontendUrl) {
-      return res.status(500).json({
-        success: false,
-        message: "CLIENT_URL environment variable is not configured. Please set it in your .env file.",
-      });
-    }
-    
-    // Clean and normalize URL:
-    // 1. Remove any commas or multiple URLs (take first one if comma-separated)
-    // 2. Trim whitespace
-    // 3. Remove trailing slashes
-    frontendUrl = frontendUrl.split(',')[0].trim().replace(/\/+$/, '');
-    
-    // Validate URL format
-    if (!frontendUrl.match(/^https?:\/\//)) {
-      return res.status(500).json({
-        success: false,
-        message: `Invalid CLIENT_URL format: "${frontendUrl}". Must start with http:// or https://`,
-      });
-    }
-    
-    const normalizedUrl = frontendUrl;
-    const qrCodeData = `${normalizedUrl}/menu/${savedQRCode.tableId}`;
-    
-    // Log the final QR code data to verify it's correct
-    console.log("CLIENT_URL (raw):", process.env.CLIENT_URL);
-    console.log("CLIENT_URL (normalized):", normalizedUrl);
-    console.log("QR code data (what will be encoded):", qrCodeData);
+    let frontendUrl;
 
-    // Generate QR code as data URL
+    // Split CLIENT_URL by comma in case you have multiple URLs
+    const urls = process.env.CLIENT_URL?.split(",").map(u => u.trim()) || [];
+
+    if (process.env.DEV_MODE === "true") {
+      // Use localhost or first URL in CLIENT_URL list
+      frontendUrl = urls[0] || "http://localhost:3000";
+    } else if (req.tenant?.domain) {
+      // Use tenant custom domain if available
+      frontendUrl = `https://${req.tenant.domain}`;
+    } else {
+      // Fallback to second URL in CLIENT_URL list (production SaaS URL)
+      frontendUrl = urls[1] || urls[0] || "https://lamkabill.netlify.app";
+    }
+
+    // Ensure valid URL format
+    if (!frontendUrl.match(/^https?:\/\//)) {
+      frontendUrl = "http://" + frontendUrl;
+    }
+
+    // Remove any trailing slashes
+    frontendUrl = frontendUrl.replace(/\/+$/, '');
+
+
+    // **Now construct QR code data**
+    const qrCodeData = `${frontendUrl}/public/table/${savedQRCode.tableId}`;
+
+    console.log("QR code data:", qrCodeData);
+
+    // Generate QR Code
     const qrCodeDataUrl = await QRCode.toDataURL(qrCodeData, {
       errorCorrectionLevel: "M",
       type: "image/png",
       quality: 0.92,
       margin: 1,
-      color: {
-        dark: "#000000",
-        light: "#FFFFFF",
-      },
       width: 300,
     });
 
-    // Update with the generated QR code URL
+    // Save
     savedQRCode.qrCodeUrl = qrCodeDataUrl;
     const finalQRCode = await savedQRCode.save();
 
@@ -125,6 +120,8 @@ export const createQRCode = async (req, res) => {
       message: "QR code created successfully",
       qrcode: finalQRCode,
     });
+
+
   } catch (error) {
     console.error("Error creating QR code:", error);
     if (error.code === 11000) {
@@ -133,12 +130,57 @@ export const createQRCode = async (req, res) => {
         message: "Table ID conflict. Please try again.",
       });
     }
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || "Failed to create QR code" 
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create QR code"
     });
   }
 };
+
+export const getQRCodeByTableIdPublic = async (req, res) => {
+  try {
+    const { tableId } = req.params;
+
+    // Get QR code and populate restaurant info
+    const qrcode = await QRCodeModel.findOne({ tableId })
+      .populate({
+        path: "user",
+        select: "businessName logo role",
+      });
+
+    if (!qrcode) {
+      return res.status(404).json({ success: false, message: "QR code not found" });
+    }
+
+    // Determine target user (superadmin)
+    let targetUserId = qrcode.user._id;
+    if (qrcode.user.role === "cashier") {
+      const superadmin = await UserModel.findOne({
+        role: "superadmin",
+        businessName: qrcode.user.businessName,
+      });
+      if (superadmin) targetUserId = superadmin._id;
+    }
+
+    // Get menu items and populate category names
+    const menuItems = await MenuItemModel.find({ user: targetUserId, isAvailable: true })
+      .populate({
+        path: "category",
+        select: "name",
+      })
+      .sort({ "category.name": 1, createdAt: -1 });
+
+    res.json({
+      success: true,
+      qrcode,
+      menuItems,
+    });
+  } catch (err) {
+    console.error("Error fetching QR code public:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 
 // Get all QR Codes
 export const getAllQRCodes = async (req, res) => {
@@ -174,7 +216,7 @@ export const getQRCodeById = async (req, res) => {
   try {
     const { id } = req.params;
     const targetUserId = await getTargetUserId(req);
-    
+
     if (!targetUserId) {
       return res.status(404).json({
         success: false,
@@ -212,7 +254,7 @@ export const getQRCodeById = async (req, res) => {
 export const getQRCodeByTableId = async (req, res) => {
   try {
     const { tableId } = req.params;
-    
+
     console.log("Public endpoint called with tableId:", tableId);
 
     if (!tableId || !tableId.trim()) {
@@ -222,9 +264,9 @@ export const getQRCodeByTableId = async (req, res) => {
       });
     }
 
-    const qrcode = await QRCodeModel.findOne({ 
+    const qrcode = await QRCodeModel.findOne({
       tableId: tableId.trim(),
-      isActive: true 
+      isActive: true
     }).populate("user", "businessName logo");
 
     if (!qrcode) {
@@ -236,9 +278,9 @@ export const getQRCodeByTableId = async (req, res) => {
     }
 
     // Get menu items for this restaurant (all QR codes share the same menu)
-    const menuItems = await MenuItemModel.find({ 
+    const menuItems = await MenuItemModel.find({
       user: qrcode.user._id,
-      isAvailable: true 
+      isAvailable: true
     })
       .populate("category", "name")
       .sort({ "category.name": 1, createdAt: -1 });
@@ -308,7 +350,7 @@ export const updateQRCode = async (req, res) => {
     if (frontendUrl && (!qrcode.qrCodeUrl || qrcode.qrCodeUrl.trim() === "" || qrcode.qrCodeUrl.includes("//menu"))) {
       // Clean and normalize URL: remove commas, trim, remove trailing slashes
       frontendUrl = frontendUrl.split(',')[0].trim().replace(/\/+$/, '');
-      
+
       // Validate URL format
       if (!frontendUrl.match(/^https?:\/\//)) {
         return res.status(500).json({
@@ -316,10 +358,10 @@ export const updateQRCode = async (req, res) => {
           message: `Invalid CLIENT_URL format: "${frontendUrl}". Cannot regenerate QR code.`,
         });
       }
-      
+
       const normalizedUrl = frontendUrl;
       const qrCodeData = `${normalizedUrl}/menu/${qrcode.tableId}`;
-      
+
       console.log("Regenerating QR code with URL:", normalizedUrl);
       console.log("QR code data:", qrCodeData);
 
@@ -360,7 +402,7 @@ export const deleteQRCode = async (req, res) => {
   try {
     const { id } = req.params;
     const targetUserId = await getTargetUserId(req);
-    
+
     if (!targetUserId) {
       return res.status(404).json({
         success: false,

@@ -59,6 +59,12 @@ const userSchema = new mongoose.Schema(
       type: [String], // Only used for cashier
       default: [],
     },
+    domain: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+    },
     resetToken: String,
     resetTokenExpire: Date,
     expiryDate: {
