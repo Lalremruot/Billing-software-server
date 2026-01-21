@@ -70,27 +70,19 @@ export const createQRCode = async (req, res) => {
     const savedQRCode = await qrcode.save();
 
     // 🟢 Fetch owner to get custom domain
-    const owner = await UserModel.findById(targetUserId).select("domain");
-
     let frontendUrl = null;
-
-    // 1️⃣ Custom domain wins first
-    if (owner?.domain && owner.domain.trim() !== "") {
+    const owner = await UserModel.findById(targetUserId).select("domain");
+    
+    if (process.env.DEV_MODE === "true") {
+      frontendUrl = "http://192.168.29.110:9000";
+    } else if (owner?.domain && owner.domain.trim() !== "") {
       frontendUrl = `https://${owner.domain.trim()}`;
-    }
-    // 2️⃣ Dev mode fallback (localhost)
-    else if (process.env.DEV_MODE === "true") {
-      frontendUrl = "http://localhost:3000";
-    }
-    // 3️⃣ SaaS production fallback using CLIENT_URL[0]
-    else {
+    } else {
       const urls = process.env.CLIENT_URL?.split(",").map(u => u.trim());
       frontendUrl = urls?.[0] || "https://lamkabill.netlify.app";
     }
-
-    // Clean trailing slash
+    
     frontendUrl = frontendUrl.replace(/\/+$/, "");
-
     // Final QR link
     const qrCodeData = `${frontendUrl}/public/table/${savedQRCode.tableId}`;
 
