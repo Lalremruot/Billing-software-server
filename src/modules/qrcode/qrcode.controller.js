@@ -84,7 +84,7 @@ export const createQRCode = async (req, res) => {
     
     frontendUrl = frontendUrl.replace(/\/+$/, "");
     // Final QR link
-    const qrCodeData = `${frontendUrl}/public/table/${savedQRCode.tableId}`;
+    const qrCodeData = `${frontendUrl}/table/${savedQRCode.tableId}`;
 
     console.log("Generated QR Code →", qrCodeData);
 
