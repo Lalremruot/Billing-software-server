@@ -53,6 +53,8 @@ export const createQRCode = async (req, res) => {
       });
     }
 
+    // For single-user project, we don't need targetUserId / tenant
+    // Create QR entry (tableId auto-generated)
     const targetUserId = await getTargetUserId(req);
     if (!targetUserId) {
       return res.status(404).json({
@@ -61,29 +63,23 @@ export const createQRCode = async (req, res) => {
       });
     }
 
-    // Create QR entry (tableId auto-generated)
+    // 2️⃣ Create the QR code document with user assigned
     const qrcode = new QRCodeModel({
-      user: targetUserId,
+      user: targetUserId,          // <-- must include this
       tableName: tableName.trim(),
     });
 
+    // 3️⃣ Save it
     const savedQRCode = await qrcode.save();
 
-    // 🟢 Fetch owner to get custom domain
-    let frontendUrl = null;
-    const owner = await UserModel.findById(targetUserId).select("domain");
-    
+    // Use only the frontend URL from env or fallback
+    let frontendUrl = process.env.CLIENT_URL || "https://lamkabill.netlify.app";
+
     if (process.env.DEV_MODE === "true") {
-      frontendUrl = "http://192.168.29.110:9000";
-    } else if (owner?.domain && owner.domain.trim() !== "") {
-      frontendUrl = `https://${owner.domain.trim()}`;
-    } else {
-      const urls = process.env.CLIENT_URL?.split(",").map(u => u.trim());
-      frontendUrl = urls?.[0] || "https://lamkabill.netlify.app";
+      frontendUrl = "http://192.168.29.110:9000"; // dev URL
     }
-    
-    frontendUrl = frontendUrl.replace(/\/+$/, "");
-    // Final QR link
+
+    frontendUrl = frontendUrl.replace(/\/+$/, ""); // remove trailing slash
     const qrCodeData = `${frontendUrl}/table/${savedQRCode.tableId}`;
 
     console.log("Generated QR Code →", qrCodeData);
@@ -113,6 +109,7 @@ export const createQRCode = async (req, res) => {
     });
   }
 };
+
 
 
 export const getQRCodeByTableIdPublic = async (req, res) => {

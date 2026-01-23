@@ -1,5 +1,5 @@
 import express from "express";
-import { protect, checkPermission, identifyTenant } from "../../middleware/protect.js";
+import { protect, checkPermission } from "../../middleware/protect.js";
 import {
   createQRCode,
   getAllQRCodes,
@@ -43,7 +43,7 @@ router.get("/v1", protect, checkPermission("qrcodemenu:view"), getAllQRCodes);
 router.get("/v1/:id", protect,checkPermission("qrcodemenu:view"), getQRCodeById);
 router.put("/v1/:id", protect, checkPermission("qrcodemenu:view"), updateQRCode);
 router.delete("/v1/:id", protect, checkPermission("qrcodemenu:view"), deleteQRCode);
-router.get("/table/:tableId", identifyTenant, getQRCodeByTableIdPublic);
+router.get("/table/:tableId" ,getQRCodeByTableIdPublic);
 
 // Public route to get QR code and menu by table ID (no auth required)
 // router.get("/public/table/:tableId", getQRCodeByTableId);
