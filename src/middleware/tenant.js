@@ -1,23 +1,26 @@
 export const identifyTenant = async (req, res, next) => {
   try {
-    // 1. Read domain from header OR fallback to req.hostname
-    let host = req.headers["x-tenant-domain"] || req.hostname;
+    // 🔹 Always read the tenant from header first
+    let host = req.headers["x-tenant-domain"];
 
-    // 2. Normalize domain (remove http, https, slashes)
+    if (!host) {
+      host = req.hostname; // fallback
+    }
+
+    // Normalize domain (remove protocol, port, slashes, lowercase)
     const normalize = (d) =>
-      d.replace(/^https?:\/\//, "").replace(/:\d+$/, "").replace(/\/$/, "").toLowerCase();
+      d.replace(/^https?:\/\//, "")
+       .replace(/:\d+$/, "")
+       .replace(/\/$/, "")
+       .toLowerCase();
 
     const hostNormalized = normalize(host);
 
-    // 3. Fetch tenants
+    // Fetch tenants
     const tenants = await UserModel.find();
 
-    // 4. Match tenant by normalized domain
-    const tenant = tenants.find((t) => {
-      if (!t.domain) return false;
-      const tenantDomain = normalize(t.domain);
-      return tenantDomain === hostNormalized;
-    });
+    // Match tenant by normalized domain
+    const tenant = tenants.find((t) => t.domain && normalize(t.domain) === hostNormalized);
 
     if (!tenant) {
       return res.status(404).json({
