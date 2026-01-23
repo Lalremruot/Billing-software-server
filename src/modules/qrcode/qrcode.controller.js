@@ -74,7 +74,7 @@ export const createQRCode = async (req, res) => {
     const owner = await UserModel.findById(targetUserId).select("domain");
     
     if (process.env.DEV_MODE === "true") {
-      frontendUrl = "http://192.168.1.5:9000";
+      frontendUrl = "http://192.168.29.110:9000";
     } else if (owner?.domain && owner.domain.trim() !== "") {
       frontendUrl = `https://${owner.domain.trim()}`;
     } else {
