@@ -1,7 +1,9 @@
+import UserModel from "../modules/user/user.model.js";
+
 export const identifyTenant = async (req, res, next) => {
   try {
     const tenantHeader = req.headers["x-tenant-domain"];
-    const host = tenantHeader || req.hostname;
+    const rawHost = tenantHeader || req.hostname;
 
     const normalize = (d) =>
       d.replace(/^https?:\/\//, "")
@@ -9,18 +11,20 @@ export const identifyTenant = async (req, res, next) => {
         .replace(/\/$/, "")
         .toLowerCase();
 
-    const hostNormalized = normalize(host);
+    const hostNormalized = normalize(rawHost);
 
-    const tenants = await UserModel.find();
-
-    const tenant = tenants.find((t) =>
-      t.domain && normalize(t.domain) === hostNormalized
-    );
+    const tenant = await UserModel.findOne({
+      domain: { $regex: new RegExp(`^${hostNormalized}$`, "i") }
+    });
 
     if (!tenant) {
       return res.status(404).json({
         success: false,
         message: `Tenant not found for domain: ${hostNormalized}`,
+        lookupAttempt: {
+          tenantHeader,
+          hostname: req.hostname
+        }
       });
     }
 
