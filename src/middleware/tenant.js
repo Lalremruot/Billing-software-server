@@ -3,18 +3,18 @@ import UserModel from "../modules/user/user.model.js";
 
 export const identifyTenant = async (req, res, next) => {
   try {
-    let host = req.hostname; // e.g., "192.168.1.8"
+    // 1. Prefer client domain header
+    let host = req.headers["x-tenant-domain"] || req.hostname;
 
-    // If in development, allow overriding host
+    // Allow DEV override
     if (process.env.DEV_MODE === "true" && process.env.CLIENT_URL) {
-      host = new URL(process.env.CLIENT_URL).hostname; // e.g., "localhost"
+      host = new URL(process.env.CLIENT_URL).hostname;
     }
 
-    // Find tenant by hostname only
     const tenants = await UserModel.find();
     const tenant = tenants.find(t => {
       try {
-        const tenantHost = new URL(t.domain).hostname; // ignore protocol & port
+        const tenantHost = new URL(t.domain).hostname;
         return tenantHost === host;
       } catch (e) {
         return false;
@@ -31,3 +31,4 @@ export const identifyTenant = async (req, res, next) => {
     return res.status(500).json({ success: false, message: "Tenant identification failed", error: err.message });
   }
 };
+
