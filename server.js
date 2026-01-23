@@ -23,6 +23,12 @@ console.log("Loaded SECRET_KEY:", process.env.SECRET_KEY ? `${process.env.SECRET
 const app = express();
 app.use(express.json())
 
+app.use((req, _, next) => {
+  console.log("➡️ Tenant header:", req.headers["x-tenant-domain"]);
+  console.log("➡️ Request hostname:", req.hostname);
+  next();
+});
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, Postman, or curl)
@@ -65,6 +71,7 @@ app.use("/api/cashier", createCashierRoute)
 app.use("/api/employee", employeeRoute)
 app.use("/api/expenses", expensesRoute)
 app.use("/api/qrcode", qrcodeRoute)
+
 
 // Create HTTP server
 const httpServer = createServer(app);
