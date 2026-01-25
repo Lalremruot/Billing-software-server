@@ -153,7 +153,7 @@ export const forgotPassword = async (req, res) => {
         );
         // For development, log the reset link to console
         const link = `${
-          process.env.CLIENT_URL || "http://localhost:5173"
+          process.env.CLIENT_URL
         }/auth/reset-password/${token}`;
         console.log(
           "🔗 Password Reset Link (EMAIL NOT CONFIGURED - Use this link):",
