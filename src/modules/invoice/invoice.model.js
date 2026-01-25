@@ -19,7 +19,7 @@ const invoiceSchema = new mongoose.Schema({
     default: "cash",
   },
   customerAddress: { type: String, required: false },
-  tableNumber: { type: Number, required: false, min: 1, max: 15 },
+  tableNumber: { type: String, required: false, min: 1, max: 15 },
   withPackaging: { type: Boolean, default: false },
   deliveryAddress: { type: String, required: false },
   deliveryCharge: { type: Number, default: 0, min: 0 },
