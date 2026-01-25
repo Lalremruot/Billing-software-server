@@ -39,6 +39,7 @@ app.use(cors({
       "http://localhost:5173",
       "https://lamkabill.netlify.app",
       "https://arsicloudkitchen.in",
+      "https://emveerest.emveemart.com",
       "http://192.168.1.5:9000",
       "http://192.168.29.110:9000",
       process.env.CLIENT_URL
