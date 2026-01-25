@@ -36,7 +36,6 @@ app.use(cors({
     
     const allowedOrigins = [
       "http://localhost:9000",
-      "http://localhost:5173",
       "https://lamkabill.netlify.app",
       "https://arsicloudkitchen.in",
       "https://emveerest.emveemart.com",
