@@ -28,6 +28,7 @@ const invoiceSchema = new mongoose.Schema({
       name: { type: String, required: true },
       quantity: { type: Number, required: true },
       price: { type: Number, required: true },
+      packaging: { type: Number, default: 0 },
       total: { type: Number, required: true },
     },
   ],
