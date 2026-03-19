@@ -432,7 +432,6 @@ export const updateProfile = async (req, res) => {
           message: "Domain already in use by another user.",
         });
       }
-
       updates.domain = sanitizedDomain;
     }
 

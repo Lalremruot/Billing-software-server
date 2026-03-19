@@ -1,4 +1,5 @@
 import ExpenseModel from "./expenses.model.js";
+import UserModel from "../user/user.model.js";
 
 export const createExpenseItem = async (req, res) => {
   try {
@@ -18,11 +19,50 @@ export const createExpenseItem = async (req, res) => {
       });
     }
 
+    let targetUserId = req.user.id;
+
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select(
+          "businessName",
+        );
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+
+      if (
+        !cashierBusinessName ||
+        (typeof cashierBusinessName === "string" &&
+          cashierBusinessName.trim() === "")
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "Business owner not found. Cannot create expense item.",
+        });
+      }
+
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({
+        role: "superadmin",
+        businessName: normalizedBusinessName,
+      });
+
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: "Business owner not found. Cannot create expense item.",
+        });
+      }
+    }
+
     const expenseItem = new ExpenseModel({
       itemName: itemName.trim(),
       totalPrice: parseFloat(totalPrice) || 0,
       dateAdded: dateAdded ? new Date(dateAdded) : new Date(),
-      user: req.user.id,
+      user: targetUserId,
     });
 
     const savedItem = await expenseItem.save();
@@ -48,7 +88,48 @@ export const getAllExpenseItems = async (req, res) => {
       });
     }
 
-    const items = await ExpenseModel.find({ user: req.user.id }).sort({
+    let targetUserId = req.user.id;
+
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select(
+          "businessName",
+        );
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+
+      if (
+        !cashierBusinessName ||
+        (typeof cashierBusinessName === "string" &&
+          cashierBusinessName.trim() === "")
+      ) {
+        return res.status(200).json({
+          success: true,
+          message: "All expense items fetched successfully",
+          data: [],
+        });
+      }
+
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({
+        role: "superadmin",
+        businessName: normalizedBusinessName,
+      });
+
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+      } else {
+        return res.status(200).json({
+          success: true,
+          message: "All expense items fetched successfully",
+          data: [],
+        });
+      }
+    }
+
+    const items = await ExpenseModel.find({ user: targetUserId }).sort({
       createdAt: -1,
     });
 
@@ -71,9 +152,48 @@ export const updateExpenseItem = async (req, res) => {
     const { id } = req.params;
     const { itemName, totalPrice, dateAdded } = req.body;
 
+    let targetUserId = req.user.id;
+
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select(
+          "businessName",
+        );
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+
+      if (
+        !cashierBusinessName ||
+        (typeof cashierBusinessName === "string" &&
+          cashierBusinessName.trim() === "")
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "Expense item not found or does not belong to this user",
+        });
+      }
+
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({
+        role: "superadmin",
+        businessName: normalizedBusinessName,
+      });
+
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: "Expense item not found or does not belong to this user",
+        });
+      }
+    }
+
     const item = await ExpenseModel.findOne({
       _id: id,
-      user: req.user.id,
+      user: targetUserId,
     });
 
     if (!item) {
@@ -112,9 +232,48 @@ export const deleteExpenseItem = async (req, res) => {
   try {
     const { id } = req.params;
 
+    let targetUserId = req.user.id;
+
+    if (req.user.role === "cashier") {
+      let cashierBusinessName = req.user.businessName;
+
+      if (!cashierBusinessName) {
+        const cashierDoc = await UserModel.findById(req.user.id).select(
+          "businessName",
+        );
+        cashierBusinessName = cashierDoc?.businessName;
+      }
+
+      if (
+        !cashierBusinessName ||
+        (typeof cashierBusinessName === "string" &&
+          cashierBusinessName.trim() === "")
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "Expense item not found or does not belong to this user",
+        });
+      }
+
+      const normalizedBusinessName = String(cashierBusinessName).trim();
+      const businessOwner = await UserModel.findOne({
+        role: "superadmin",
+        businessName: normalizedBusinessName,
+      });
+
+      if (businessOwner && businessOwner._id) {
+        targetUserId = businessOwner._id;
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: "Expense item not found or does not belong to this user",
+        });
+      }
+    }
+
     const item = await ExpenseModel.findOne({
       _id: id,
-      user: req.user.id,
+      user: targetUserId,
     });
 
     if (!item) {
