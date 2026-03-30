@@ -1,5 +1,5 @@
 import express from "express";
-import { protect } from "../../middleware/protect.js";
+import { protect, checkPermission } from "../../middleware/protect.js";
 import {
   createExpenseItem,
   getAllExpenseItems,
@@ -9,10 +9,10 @@ import {
 
 const router = express.Router();
 
-router.post("/v1", protect, createExpenseItem);
-router.get("/v1", protect, getAllExpenseItems);
-router.put("/v1/:id", protect, updateExpenseItem);
-router.delete("/v1/:id", protect, deleteExpenseItem);
+router.post("/v1", protect, checkPermission("expenses:create"), createExpenseItem);
+router.get("/v1", protect, checkPermission("expenses:view"), getAllExpenseItems);
+router.put("/v1/:id", protect, checkPermission("expenses:create"), updateExpenseItem);
+router.delete("/v1/:id", protect, checkPermission("expenses:create"), deleteExpenseItem);
 
 export default router;
 

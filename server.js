@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config() 
+console.log("DEBUG MONGO_URI:", process.env.MONGO_URI); // Add this line
 import express from "express"
 import cors from "cors"
 import { createServer } from "http";
