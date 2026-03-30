@@ -34,7 +34,8 @@ const invoiceSchema = new mongoose.Schema({
   ],
 }, { timestamps: true });
 
-invoiceSchema.pre("save", async function (next) {
+// ✅ Correct - no next parameter, just return promise
+invoiceSchema.pre("save", async function () {
   const invoice = this;
   if (invoice.status === "final" && !invoice.invoiceNumber) {
     try {
@@ -44,33 +45,31 @@ invoiceSchema.pre("save", async function (next) {
         .select("invoiceNumber");
 
       let nextNumber = 1;
-      
+
       if (highestInvoice && highestInvoice.invoiceNumber) {
-        // Extract numeric part from invoice number (e.g., "INV#00001" -> 1)
         const match = highestInvoice.invoiceNumber.match(/(\d+)$/);
         if (match) {
           nextNumber = parseInt(match[1], 10) + 1;
         }
       }
 
-      // Format with leading zeros (5 digits: 00001, 00002, etc.)
       const formattedNumber = String(nextNumber).padStart(5, "0");
       invoice.invoiceNumber = `INV${formattedNumber}`;
     } catch (error) {
-      // If error occurs, fallback to timestamp-based number
       const fallbackNumber = String(Date.now()).slice(-5).padStart(5, "0");
       invoice.invoiceNumber = `INV${fallbackNumber}`;
     }
   }
-  next();
+  // No next() needed — async function returns a promise automatically
 });
 
 
-invoiceSchema.pre("validate", function (next) {
+// ✅ Same fix for validate hook
+invoiceSchema.pre("validate", function () {
   this.items.forEach((item) => {
     if (!item.total) item.total = item.quantity * item.price;
   });
-  next();
+  // No next() needed
 });
 
 export default mongoose.model("Invoice", invoiceSchema);

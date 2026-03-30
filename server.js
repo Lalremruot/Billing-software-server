@@ -71,7 +71,14 @@ app.use("/api/product", productRoute)
 app.use("/api/cashier", createCashierRoute)
 app.use("/api/employee", employeeRoute)
 app.use("/api/expenses", expensesRoute)
+
 app.use("/api/qrcode", qrcodeRoute)
+
+// Global error handler (must be after all routes)
+app.use((err, req, res, next) => {
+  console.error("GLOBAL ERROR HANDLER:", err);
+  res.status(500).json({ success: false, message: err.message || "Internal Server Error" });
+});
 
 
 // Create HTTP server
